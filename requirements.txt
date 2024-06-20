@@ -1,0 +1,14 @@
+langchain 
+langgraph  
+langchain_milvus
+langchain_community 
+langchain-openai 
+langchain_experimental 
+langchainhub 
+pymilvus
+tavily-python
+langsmith
+bs4
+lxml
+gradio
+python-dotenv
