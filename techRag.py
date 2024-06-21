@@ -91,7 +91,7 @@ class TechRAG:
         )
         self.retriever = self.vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 6 })
 
-
+        self.vs_length = self.__get_vector_db_text_length()
 
 
         
@@ -309,7 +309,18 @@ class TechRAG:
             return "generate"
 
 
-       
+    def __get_vector_db_text_length(self) -> int:
+        schema = self.collection.schema
+        schema_dict = schema.to_dict()
+        # Extract the max_length of the "text" field
+        max_length = None
+        for field in schema_dict['fields']:
+            if field['name'] == 'text':
+                max_length = field['params'].get('max_length')
+                break
+
+        return max_length
+  
     
     # ----------------------------- Public functions ----------------------------- #
 
@@ -359,14 +370,24 @@ class TechRAG:
 
         doc_splits = text_splitter.split_documents(docs_list)
 
-        
+        # check that the split is not too big for the vector store. 
+        for split in doc_splits:
+            if len(split.page_content) > self.vs_length:
+                # delete the element
+                doc_splits.remove(split)
+                print(f"Split removed to to excessive length (over {self.vs_length})")
+                return_str = return_str + f"Split removed to to excessive length (over {self.vs_length})\n"
+
+       
         print("Adding to vector store...")
         if self.inform and self.debug: gr.Info(f"Adding to vector store...")
         # Add to vectorstore
         ids = self.vectorstore.add_documents(documents=doc_splits)
         print(f"Done!  {len(doc_splits)} records added")
         if self.inform: gr.Info(f"Done!  {len(doc_splits)} records added")
+        
         return return_str + str(len(doc_splits)) + " records ingested"
+
 
 
     def ingest_fact(self, title: str, description: str, fact: str) -> str:
@@ -387,6 +408,15 @@ class TechRAG:
         text_splitter = SemanticChunker(self.embedding_function)
 
         facts = text_splitter.split_text(fact)
+
+        # check that the split is not too big for the vector store
+        for split in facts:
+            if len(split.page_content) > self.vs_length:
+                # delete the element
+                facts.remove(split)
+                print(f"Split removed to to excessive length (over {self.vs_length})")
+                return_str = return_str + f"Split removed to to excessive length (over {self.vs_length})\n"
+
 
         metadata = {
             'source': 'Fact', 

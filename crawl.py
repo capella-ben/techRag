@@ -52,7 +52,8 @@ def crawl(url, max_depth=1):
 
 
 if __name__ == "__main__":
-    result = crawl("https://python.langchain.com/v0.2/docs/introduction/", max_depth=1)
+    result = crawl("https://neo4j.com/docs/cypher-manual/current/introduction/", max_depth=1)
+    
     
     with open("crawl_results.csv", mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)

@@ -94,14 +94,12 @@ CSS ="""
 # create the tabbed interface.
 myApp = gr.TabbedInterface([chatbot_interface, url_ingestion_interface, fact_ingestion_interface], 
                            ["Chat", "Ingest URL", "Ingest Fact"],
-                           css=CSS)
+                           css=CSS, title="Tech RAG")
 
 # create the RAG application
 tr = TechRAG(collection_name="techRag", vector_db_host="192.168.0.205", inform=True, debug=True)
 
 # Launch the demo
 myApp.launch(share=False, server_name="0.0.0.0")
-
-
 
 
