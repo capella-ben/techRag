@@ -52,9 +52,17 @@ def crawl(url, max_depth=1):
 
 
 if __name__ == "__main__":
-    result = crawl("https://neo4j.com/docs/cypher-manual/current/introduction/", max_depth=1)
-    
-    
+    result = crawl("https://neo4j.com/docs/operations-manual/current/", max_depth=1)
+
+    print()
+    print('----------------------------------------------------------------------')
+    result.sort(key=lambda x: x[0])
+    for url, title in result:
+        print(url)
+    print()
+    print()
+
+
     with open("crawl_results.csv", mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(["URL", "Title"])
@@ -62,3 +70,4 @@ if __name__ == "__main__":
             writer.writerow([url, title])
     
     print("Results saved to crawl_results.csv")
+    

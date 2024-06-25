@@ -89,7 +89,8 @@ class TechRAG:
             connection_args={"host": vector_db_host, "port": vector_db_port}, 
             auto_id=True
         )
-        self.retriever = self.vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 6 })
+        self.retriever = self.vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 6 , "lambda_mult": 0.5})
+        # lambda_mult (float) – Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to maximum relevance. Defaults to 0.5.
 
         self.vs_length = self.__get_vector_db_text_length()
 

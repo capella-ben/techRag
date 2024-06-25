@@ -4,6 +4,10 @@ import os
 from typing import List, Dict
 from dotenv import load_dotenv
 
+# for vamilla chat
+from langchain.schema import AIMessage, HumanMessage
+from openai import OpenAI
+
 load_dotenv()
 vector_db_server = os.getenv('VECTOR_DB_STORE')
 
@@ -52,6 +56,25 @@ def ingest_fact(title: str, description: str, fact: str) -> str:
     return tr.ingest_fact(title, description, fact)
 
 
+def vanilla_chat(message, history):
+    history_openai_format = []
+    for human, assistant in history:
+        history_openai_format.append({"role": "user", "content": human })
+        history_openai_format.append({"role": "assistant", "content":assistant})
+    history_openai_format.append({"role": "user", "content": message})
+  
+    response = vanilla_llm.chat.completions.create(model='gpt-4o',
+    messages= history_openai_format,
+    temperature=1.0,
+    stream=True)
+
+    partial_message = ""
+    for chunk in response:
+        if chunk.choices[0].delta.content is not None:
+              partial_message = partial_message + chunk.choices[0].delta.content
+              yield partial_message
+
+
 # ------------------------- Create Interface Elements ------------------------ #
 chatbot_interface = gr.ChatInterface(
     fn=chatbot_response,
@@ -60,6 +83,16 @@ chatbot_interface = gr.ChatInterface(
     fill_height=True,
     retry_btn=None,
     chatbot=gr.Chatbot(elem_id="chatbot")
+)
+
+vanilla_chatbot_interface = gr.ChatInterface(
+    fn=vanilla_chat,
+    title="Basic Chatbot",
+    #description="Enter your message to the chatbot.",
+    fill_height=True,
+    retry_btn=None,
+    chatbot=gr.Chatbot(elem_id="chatbot"),
+    multimodal=False
 )
 
 
@@ -80,6 +113,8 @@ fact_ingestion_interface = gr.Interface(
     allow_flagging="never"
 )
 
+# setup non-RAG LLM
+vanilla_llm = OpenAI()
 
 # in the CSS you need to config the full heirarchy of divs to be 'flex' so that the one you want (#chatbot) can be set to grow. 
 CSS ="""
@@ -92,8 +127,8 @@ CSS ="""
 """
 
 # create the tabbed interface.
-myApp = gr.TabbedInterface([chatbot_interface, url_ingestion_interface, fact_ingestion_interface], 
-                           ["Chat", "Ingest URL", "Ingest Fact"],
+myApp = gr.TabbedInterface([chatbot_interface, vanilla_chatbot_interface, url_ingestion_interface, fact_ingestion_interface], 
+                           ["RAG Chat", "Chat", "Ingest URL", "Ingest Fact"],
                            css=CSS, title="Tech RAG")
 
 # create the RAG application
