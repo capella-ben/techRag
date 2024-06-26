@@ -42,6 +42,18 @@ def ingest_urls(urls: List[str]) -> str:
     return tr.ingest_urls(url_list)
 
 
+def ingest_docx(filenames: List[str]) -> str:
+    """Ingest data from a list of word documents
+
+    Args:
+        filenames (list[str]): List of the filenames to ingest
+
+    Returns:
+        str: Status of ingestion
+    """
+    return tr.ingest_docx(filenames)
+
+
 def ingest_fact(title: str, description: str, fact: str) -> str:
     """Ingest manually entered data
 
@@ -105,6 +117,17 @@ url_ingestion_interface = gr.Interface(
     allow_flagging="never"
 )
 
+
+docx_ingestion_interface = gr.Interface(
+    fn=ingest_docx,
+    inputs=gr.File(file_count="multiple", file_types=[".docx"], type="filepath"),
+    outputs="text",
+    title="Word Document Ingestion",
+    description="Submit docx files for ingestion.",
+    allow_flagging="never"
+)
+
+
 fact_ingestion_interface = gr.Interface(
     fn=ingest_fact,
     inputs=[gr.Textbox(label="Title"), gr.Textbox(label='Description'), gr.Textbox(label="Fact", lines=5)],
@@ -127,8 +150,8 @@ CSS ="""
 """
 
 # create the tabbed interface.
-myApp = gr.TabbedInterface([chatbot_interface, vanilla_chatbot_interface, url_ingestion_interface, fact_ingestion_interface], 
-                           ["RAG Chat", "Chat", "Ingest URL", "Ingest Fact"],
+myApp = gr.TabbedInterface([chatbot_interface, vanilla_chatbot_interface, url_ingestion_interface, fact_ingestion_interface, docx_ingestion_interface], 
+                           ["RAG Chat", "Chat", "Ingest URL", "Ingest Fact", "Ingest Document"],
                            css=CSS, title="Tech RAG")
 
 # create the RAG application

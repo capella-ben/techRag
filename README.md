@@ -23,10 +23,11 @@ In addition to URL ingestion, users can manually enter facts into the system. Th
 
 ## Requirements
 
-1. Install libraries as per requirements.txt
-2. A Milvus vector store.  
+1. Install pandoc: https://pandoc.org/
+2. Install libraries as per requirements.txt
+3. A Milvus vector store.  
   1. Authentication i not required
-3. API keys for:
+4. API keys for:
   1. OpenAi
   2. Tavily
 

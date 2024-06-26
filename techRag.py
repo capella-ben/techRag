@@ -1,5 +1,7 @@
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 #from langchain_community.vectorstores import Milvus
 from langchain_milvus.vectorstores import Milvus
 from langchain_openai import OpenAIEmbeddings
@@ -16,6 +18,8 @@ from langchain.schema import Document
 from langgraph.graph import END, StateGraph
 import gradio as gr
 from pymilvus import connections, Collection
+import os
+import pypandoc
 
 # Required environment variables:
 # OPENAI_API_KEY, TAVILY_API_KEY
@@ -322,6 +326,51 @@ class TechRAG:
 
         return max_length
   
+
+    def ingest_docs(self, docs: List[Document]) -> str:
+        return_str = ""
+        
+        # Make sure all the metadata is populated.  If it is not then Milvus won't be able to import it. 
+        for doc in docs:
+            for d in doc:
+                source = d.metadata.get('source', '').split('/')[-1]
+                
+                if d.metadata.get('title') is None:
+                    d.metadata['title'] = source
+                if d.metadata.get('description') is None:
+                    d.metadata['description'] = source
+                if d.metadata.get('language') is None:
+                    d.metadata['language'] = 'en'
+            
+
+        docs_list = [item for sublist in docs for item in sublist]
+
+        print("Splitting documents...")
+        if self.inform and self.debug: gr.Info(f"Splitting documents...")
+        # Split
+        text_splitter = SemanticChunker(self.embedding_function)
+
+        doc_splits = text_splitter.split_documents(docs_list)
+
+        # check that the split is not too big for the vector store. 
+        for split in doc_splits:
+            if len(split.page_content) > self.vs_length:
+                # delete the element
+                doc_splits.remove(split)
+                print(f"Split removed to to excessive length (over {self.vs_length})")
+                return_str = return_str + f"Split removed to to excessive length (over {self.vs_length})\n"
+
+       
+        print("Adding to vector store...")
+        if self.inform and self.debug: gr.Info(f"Adding to vector store...")
+        # Add to vectorstore
+        ids = self.vectorstore.add_documents(documents=doc_splits)
+        print(f"Done!  {len(doc_splits)} records added")
+        if self.inform: gr.Info(f"Done!  {len(doc_splits)} records added")
+        
+        return return_str + str(len(doc_splits)) + " records ingested"
+
+
     
     # ----------------------------- Public functions ----------------------------- #
 
@@ -352,12 +401,12 @@ class TechRAG:
         # Make sure all the metadata is populated.  If it is not then Milvus won't be able to import it. 
         for doc in docs:
             for d in doc:
-                source_filename = d.metadata.get('source', '').split('/')[-1]
+                source = d.metadata.get('source', '').split('/')[-1]
                 
                 if d.metadata.get('title') is None:
-                    d.metadata['title'] = source_filename
+                    d.metadata['title'] = source
                 if d.metadata.get('description') is None:
-                    d.metadata['description'] = source_filename
+                    d.metadata['description'] = source
                 if d.metadata.get('language') is None:
                     d.metadata['language'] = 'en'
             
@@ -370,6 +419,90 @@ class TechRAG:
         text_splitter = SemanticChunker(self.embedding_function)
 
         doc_splits = text_splitter.split_documents(docs_list)
+
+        # check that the split is not too big for the vector store. 
+        for split in doc_splits:
+            if len(split.page_content) > self.vs_length:
+                # delete the element
+                doc_splits.remove(split)
+                print(f"Split removed to to excessive length (over {self.vs_length})")
+                return_str = return_str + f"Split removed to to excessive length (over {self.vs_length})\n"
+
+       
+        print("Adding to vector store...")
+        if self.inform and self.debug: gr.Info(f"Adding to vector store...")
+        # Add to vectorstore
+        ids = self.vectorstore.add_documents(documents=doc_splits)
+        print(f"Done!  {len(doc_splits)} records added")
+        if self.inform: gr.Info(f"Done!  {len(doc_splits)} records added")
+        
+        return return_str + str(len(doc_splits)) + " records ingested"
+
+
+    def ingest_docx(self, filenames) -> str:
+        return_str = ""     # build a results string with info on such things as the url's that are already in the vector store.
+
+        filenames = [s for s in filenames if s.strip()]       # clean out any empty entries
+
+        md_filenames = []
+        # convert to markdown
+        for filename in filenames:
+            md_filename = str(filename).replace(".docx", ".md")
+            pypandoc.convert_file(filename, 'md', outputfile=md_filename)
+            md_filenames.append(md_filename)
+
+
+        print("Loading and Splitting Word documents...")
+        if self.inform and self.debug: gr.Info(f"Loading and Splitting Word documents...")
+
+        # check to see if the filename is already in the vector store
+        """clean_filenames = []
+        for u in filenames:
+            results = self.collection.query(expr=f'source == "{u}"')
+            if not results: 
+                clean_filenames.append(u)
+            else:
+                return_str = return_str + u  + " is already in vector store" + "\n"
+        """
+        print(f"filtered: {len(md_filenames)}")
+        if len(md_filenames) == 0: return return_str       # if there are no urls left in the list then 
+
+
+        headers_to_split_on = [
+            ("#", "Header 1"),
+            ("##", "Header 2")
+        ]
+
+        # Load
+        doc_splits=[]
+        for md_filename in md_filenames:
+            
+            with open(md_filename, 'r') as mdf:
+                md = mdf.read()
+            markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on, return_each_line=False, strip_headers=False)
+            docs = markdown_splitter.split_text(md)
+            
+            # remove any splits that don't have a header and are the Table of Contents
+            docs = [d for d in docs if d.metadata.get('Header 1') and d.metadata['Header 1'] != "Table of Contents"]
+
+            # Make sure all the metadata is populated.  If it is not then Milvus won't be able to import it.
+            for d in docs:
+                source = os.path.basename(md_filename)
+                title = d.metadata.get('Header 1', '') + ', ' + d.metadata.get('Header 2', '')
+
+                d.metadata['source'] = source
+                if d.metadata.get('title') is None:
+                    d.metadata['title'] = source
+                if d.metadata.get('description') is None:
+                    d.metadata['description'] = title
+                if d.metadata.get('language') is None:
+                    d.metadata['language'] = 'en'
+
+            doc_splits = doc_splits + docs
+
+            # delete .md file
+
+
 
         # check that the split is not too big for the vector store. 
         for split in doc_splits:
