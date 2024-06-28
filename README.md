@@ -20,10 +20,17 @@ Users can submit a list of URLs to the application for ingestion. This feature p
 
 In addition to URL ingestion, users can manually enter facts into the system. This feature requires a title, description, and the fact itself, allowing for detailed and structured data entry.
 
+### Document Ingestion
+
+MS Word document can be ingested using this feature.  They are split along the lines of headers so it is reommended that these are represented in the document. Headings levels 1 and 2 are split. 
+
 
 ## Requirements
 
 1. Install pandoc: https://pandoc.org/
+  1. Must be version 3.2 or higher
+  2. Download from: https://github.com/jgm/pandoc/releases/latest
+  3. Install via: https://pandoc.org/installing.html
 2. Install libraries as per requirements.txt
 3. A Milvus vector store.  
   1. Authentication i not required

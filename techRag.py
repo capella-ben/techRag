@@ -456,14 +456,15 @@ class TechRAG:
         if self.inform and self.debug: gr.Info(f"Loading and Splitting Word documents...")
 
         # check to see if the filename is already in the vector store
-        """clean_filenames = []
+        clean_filenames = []
         for u in filenames:
-            results = self.collection.query(expr=f'source == "{u}"')
+            results = self.collection.query(expr=f'source == "{os.path.basename(u)}"')
             if not results: 
                 clean_filenames.append(u)
             else:
                 return_str = return_str + u  + " is already in vector store" + "\n"
-        """
+        md_filenames = clean_filenames
+
         print(f"filtered: {len(md_filenames)}")
         if len(md_filenames) == 0: return return_str       # if there are no urls left in the list then 
 
@@ -473,7 +474,7 @@ class TechRAG:
             ("##", "Header 2")
         ]
 
-        # Load
+        # Load and split
         doc_splits=[]
         for md_filename in md_filenames:
             
@@ -499,9 +500,6 @@ class TechRAG:
                     d.metadata['language'] = 'en'
 
             doc_splits = doc_splits + docs
-
-            # delete .md file
-
 
 
         # check that the split is not too big for the vector store. 

@@ -158,6 +158,6 @@ myApp = gr.TabbedInterface([chatbot_interface, vanilla_chatbot_interface, url_in
 tr = TechRAG(collection_name="techRag", vector_db_host="192.168.0.205", inform=True, debug=True)
 
 # Launch the demo
-myApp.launch(share=False, server_name="0.0.0.0")
+myApp.launch(share=False, server_name="0.0.0.0", favicon_path="techRag.png")
 
 
