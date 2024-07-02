@@ -1,8 +1,6 @@
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain_text_splitters import MarkdownHeaderTextSplitter
-#from langchain_community.vectorstores import Milvus
 from langchain_milvus.vectorstores import Milvus
 from langchain_openai import OpenAIEmbeddings
 from typing import Literal
@@ -543,7 +541,7 @@ class TechRAG:
 
         # check that the split is not too big for the vector store
         for split in facts:
-            if len(split.page_content) > self.vs_length:
+            if len(split) > self.vs_length:
                 # delete the element
                 facts.remove(split)
                 print(f"Split removed to to excessive length (over {self.vs_length})")

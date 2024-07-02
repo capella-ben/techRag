@@ -3,15 +3,8 @@ from techRag import TechRAG
 import os
 from typing import List, Dict
 from dotenv import load_dotenv
-
-# for vamilla chat
-from langchain.schema import AIMessage, HumanMessage
 from openai import OpenAI
 
-load_dotenv()
-vector_db_server = os.getenv('VECTOR_DB_STORE')
-
-os.environ['GRADIO_ANALYTICS_ENABLED'] = 'true'
 
 
 # ---------------------------- Interface Functions --------------------------- #
@@ -69,6 +62,25 @@ def ingest_fact(title: str, description: str, fact: str) -> str:
 
 
 def vanilla_chat(message, history):
+    """
+    Generate a chat response using a language model without RAG.
+
+    This function takes a new message and chat history, formats them for the OpenAI API,
+    and streams the response from the language model.
+
+    Args:
+        message (str): The current message from the user.
+        history (list): A list of tuples, where each tuple contains two strings:
+                        (human_message, assistant_response).
+
+    Yields:
+        str: Partial responses from the language model, incrementally building
+             the complete response.
+
+    Raises:
+        Any exceptions raised by the underlying API calls are not caught in this function.
+    """
+
     history_openai_format = []
     for human, assistant in history:
         history_openai_format.append({"role": "user", "content": human })
@@ -87,77 +99,102 @@ def vanilla_chat(message, history):
               yield partial_message
 
 
-# ------------------------- Create Interface Elements ------------------------ #
-chatbot_interface = gr.ChatInterface(
-    fn=chatbot_response,
-    #title="Chatbot",
-    #description="Enter your message to the chatbot.",
-    fill_height=True,
-    retry_btn=None,
-    chatbot=gr.Chatbot(elem_id="chatbot")
-)
-
-vanilla_chatbot_interface = gr.ChatInterface(
-    fn=vanilla_chat,
-    title="Basic Chatbot",
-    #description="Enter your message to the chatbot.",
-    fill_height=True,
-    retry_btn=None,
-    chatbot=gr.Chatbot(elem_id="chatbot"),
-    multimodal=False
-)
 
 
-url_ingestion_interface = gr.Interface(
-    fn=ingest_urls,
-    inputs=gr.Textbox(lines=5, placeholder="Enter URLs here, one per line"),
-    outputs="text",
-    title="URL Ingestion",
-    description="Submit URLs for ingestion, one per line.",
-    allow_flagging="never"
-)
+load_dotenv()
+vector_db_server = os.getenv('VECTOR_DB_STORE')
 
+os.environ['GRADIO_ANALYTICS_ENABLED'] = 'true'
 
-docx_ingestion_interface = gr.Interface(
-    fn=ingest_docx,
-    inputs=gr.File(file_count="multiple", file_types=[".docx"], type="filepath"),
-    outputs="text",
-    title="Word Document Ingestion",
-    description="Submit docx files for ingestion.",
-    allow_flagging="never"
-)
-
-
-fact_ingestion_interface = gr.Interface(
-    fn=ingest_fact,
-    inputs=[gr.Textbox(label="Title"), gr.Textbox(label='Description'), gr.Textbox(label="Fact", lines=5)],
-    outputs="text",
-    title="Fact Ingestion",
-    allow_flagging="never"
-)
+# [Your existing function definitions here: chatbot_response, ingest_urls, ingest_docx, ingest_fact, vanilla_chat]
 
 # setup non-RAG LLM
 vanilla_llm = OpenAI()
 
-# in the CSS you need to config the full heirarchy of divs to be 'flex' so that the one you want (#chatbot) can be set to grow. 
-CSS ="""
-.contain { display: flex; flex-direction: column; }
+# Create the RAG application
+tr = TechRAG(collection_name="techRag", vector_db_host="192.168.0.205", inform=True, debug=True)
+
+CSS = """
+.wrap { display: flex; flex-direction: column; flex-grow: 1}
+.contain { display: flex; flex-direction: column; flex-grow: 1}
 .gradio-container { height: 100vh !important; }
 .tabs { display: flex !important; flex-direction: column; flex-grow: 1}
 .tabitem[role="tabpanel"][style="display: block;"] { display: flex !important; flex-direction: column; flex-grow: 1}
 .gap {display: flex; flex-direction: column; flex-grow: 1}
-#chatbot { flex-grow: 1; }
+#chatbot { display: flex !important; flex-direction: column; flex-grow: 1; }
+
+.fancy-line {
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+    margin: 20px 0;
+}
+
 """
 
-# create the tabbed interface.
-myApp = gr.TabbedInterface([chatbot_interface, vanilla_chatbot_interface, url_ingestion_interface, fact_ingestion_interface, docx_ingestion_interface], 
-                           ["RAG Chat", "Chat", "Ingest URL", "Ingest Fact", "Ingest Document"],
-                           css=CSS, title="Tech RAG")
+with gr.Blocks(css=CSS, title="Tech RAG") as demo:
+    with gr.Tabs() as tabs:
+        with gr.TabItem("RAG Chat"):
+            chatbot = gr.Chatbot(elem_id="chatbot", layout='panel')
+            msg = gr.Textbox(placeholder="Type a message...", label="")
+            clear = gr.Button("Clear")
 
-# create the RAG application
-tr = TechRAG(collection_name="techRag", vector_db_host="192.168.0.205", inform=True, debug=True)
+            def respond(message, chat_history):
+                bot_message = chatbot_response(message, chat_history)
+                chat_history.append((message, bot_message))
+                return "", chat_history
 
-# Launch the demo
-myApp.launch(share=False, server_name="0.0.0.0", favicon_path="techRag.ico")
+            msg.submit(respond, [msg, chatbot], [msg, chatbot])
+            clear.click(lambda: None, None, chatbot, queue=False)
 
+        with gr.TabItem("Chat"):
+            vanilla_chatbot = gr.Chatbot(elem_id="chatbot", layout='panel')
+            vanilla_msg = gr.Textbox(placeholder="Type a message...", label="")
+            vanilla_clear = gr.Button("Clear")
 
+            def vanilla_respond(message, chat_history):
+                bot_message = ""
+                for chunk in vanilla_chat(message, chat_history):
+                    bot_message = chunk
+                    yield chat_history + [[message, bot_message]]
+                chat_history.append((message, bot_message))
+                return chat_history
+            
+            vanilla_msg.submit(vanilla_respond, [vanilla_msg, vanilla_chatbot], [vanilla_chatbot])
+            vanilla_clear.click(lambda: None, None, vanilla_chatbot, queue=False)
+
+        with gr.TabItem("Ingest"):
+            # Ingest URL
+            with gr.Group():
+                with gr.Row():
+                    url_input = gr.Textbox(lines=5, placeholder="Enter URLs here, one per line", label="URLs")
+                    url_output = gr.Textbox(label="Output")
+                url_button = gr.Button("Ingest URLs")
+                url_button.click(ingest_urls, inputs=url_input, outputs=url_output)
+
+            gr.HTML("<hr class='fancy-line'>")
+
+            # Ingest Fact
+            with gr.Group():
+                with gr.Row():
+                    with gr.Group():
+                        fact_title = gr.Textbox(label="Fact Title")
+                        fact_description = gr.Textbox(label="Description")
+                        fact_content = gr.Textbox(label="Fact", lines=5)
+                    fact_output = gr.Textbox(label="Output")
+                fact_button = gr.Button("Ingest Fact")
+
+            fact_button.click(ingest_fact, inputs=[fact_title, fact_description, fact_content], outputs=fact_output)
+
+            gr.HTML("<hr class='fancy-line'>")
+
+            # Ingest Document
+            with gr.Group():
+                with gr.Row():
+                    docx_input = gr.File(file_count="multiple", file_types=[".docx"], type="filepath")
+                    docx_output = gr.Textbox(label="Output")
+                docx_button = gr.Button("Ingest Documents")
+
+            docx_button.click(ingest_docx, inputs=docx_input, outputs=docx_output)
+
+demo.launch(share=False, server_name="0.0.0.0", favicon_path="techRag.ico")
