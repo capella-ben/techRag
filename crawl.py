@@ -1,9 +1,11 @@
 import requests
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
-import re
 import csv
+import argparse
 
+"""Utility script to perform a crawl a web site in order to get a list of URL's for ingestion.
+"""
 
 def is_valid_url(url):
     parsed = urlparse(url)
@@ -52,7 +54,13 @@ def crawl(url, max_depth=1):
 
 
 if __name__ == "__main__":
-    result = crawl("https://neo4j.com/docs/operations-manual/current/", max_depth=1)
+    parser = argparse.ArgumentParser(description="Web crawler script")
+    parser.add_argument("url", help="URL to start crawling from")
+    parser.add_argument("--max_depth", type=int, default=1, help="Maximum depth to crawl (default: 1)")
+    parser.add_argument("--output", default="crawl_results.csv", help="Output file name (default: crawl_results.csv)")
+    args = parser.parse_args()
+
+    result = crawl(args.url, max_depth=args.max_depth)
 
     print()
     print('----------------------------------------------------------------------')
@@ -63,7 +71,7 @@ if __name__ == "__main__":
     print()
 
 
-    with open("crawl_results.csv", mode="w", newline="", encoding="utf-8") as file:
+    with open(args.output, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(["URL", "Title"])
         for url, title in result:

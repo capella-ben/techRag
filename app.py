@@ -8,7 +8,7 @@ from openai import OpenAI
 
 
 # ---------------------------- Interface Functions --------------------------- #
-def chatbot_response(message: str, history: List[str]) -> str:
+def rag_response(message: str, history: List[str]) -> str:
     """Chatbot Interface Function
 
     Args:
@@ -103,16 +103,15 @@ def vanilla_chat(message, history):
 
 load_dotenv()
 vector_db_server = os.getenv('VECTOR_DB_STORE')
+collection_name = os.getenv('COLLECTION_NAME')
 
-os.environ['GRADIO_ANALYTICS_ENABLED'] = 'true'
-
-# [Your existing function definitions here: chatbot_response, ingest_urls, ingest_docx, ingest_fact, vanilla_chat]
+os.environ['GRADIO_ANALYTICS_ENABLED'] = 'false'
 
 # setup non-RAG LLM
 vanilla_llm = OpenAI()
 
 # Create the RAG application
-tr = TechRAG(collection_name="techRag", vector_db_host="192.168.0.205", inform=True, debug=True)
+tr = TechRAG(collection_name=collection_name, vector_db_host=vector_db_server, inform=True, debug=True)
 
 CSS = """
 .wrap { display: flex; flex-direction: column; flex-grow: 1}
@@ -140,7 +139,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
             clear = gr.Button("Clear")
 
             def respond(message, chat_history):
-                bot_message = chatbot_response(message, chat_history)
+                bot_message = rag_response(message, chat_history)
                 chat_history.append((message, bot_message))
                 return "", chat_history
 
@@ -156,11 +155,11 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                 bot_message = ""
                 for chunk in vanilla_chat(message, chat_history):
                     bot_message = chunk
-                    yield chat_history + [[message, bot_message]]
+                    yield "", chat_history + [[message, bot_message]]
                 chat_history.append((message, bot_message))
-                return chat_history
+                return "", chat_history
             
-            vanilla_msg.submit(vanilla_respond, [vanilla_msg, vanilla_chatbot], [vanilla_chatbot])
+            vanilla_msg.submit(vanilla_respond, [vanilla_msg, vanilla_chatbot], [vanilla_msg, vanilla_chatbot])
             vanilla_clear.click(lambda: None, None, vanilla_chatbot, queue=False)
 
         with gr.TabItem("Ingest"):

@@ -41,14 +41,19 @@ MS Word document can be ingested using this feature.  They are split along the l
 
 ## Project Configuration
 
-This project relies on a set of environment variables to configure various aspects of its functionality. These variables are stored in a `.env` file. Below is a detailed explanation of each variable and its purpose.
+The following provides details on configuration required for the project.
 
 ### Environment Variables
 
+This project relies on a set of environment variables to configure various aspects of its functionality. These variables are stored in a `.env` file. Below is a detailed explanation of each variable and its purpose.
+
 #### Database Configuration
 
-- **VECTOR_DB_STORE**: The IP address of the vector database store.
+- **VECTOR_DB_STORE**: The IP address of the Milvus vector database store.
   - Example: `192.168.1.100`
+
+- **COLLECTION_NAME**: The name of the collection in the Milvus vector store.
+  - Example: `techRag`
 
 #### User Agent
 
@@ -74,17 +79,18 @@ This project relies on a set of environment variables to configure various aspec
 - **LANGCHAIN_API_KEY**: The API key for accessing LangChain services.
   - Example: `lk-11223344556677889900aabbccddeeff`
 
-### Usage
+#### Usage
 
 1. Create a `.env` file in the root directory of your project.
 2. Copy and paste the environment variables listed above into the `.env` file.
 3. Replace the example values with your actual configuration values.
 4. Ensure your application is configured to load environment variables from the `.env` file.
 
-### Example `.env` File
+#### Example `.env` File
 
 ```env
 VECTOR_DB_STORE=192.168.1.100
+COLLECTION_NAME=techRag
 USER_AGENT=techRag
 
 OPENAI_API_KEY=sk-1234567890abcdef1234567890abcdef
@@ -96,10 +102,14 @@ LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
 LANGCHAIN_API_KEY=lk-11223344556677889900aabbccddeeff
 ```
 
-### Notes
+### Milvus Collection Setup
 
-- The **VECTOR_DB_STORE** variable should be set to the IP address of your vector database store.
-- The **USER_AGENT** should be a string that represents your application.
-- The **OPENAI_API_KEY** and **TAVILY_API_KEY** should be obtained from their respective service providers.
-- The tracing configuration is optional and can be omitted if not needed.
+A collection must be created in the Milvus database.  Once the .env file has been setup run the following script:
+```Milvus_Create_Collection.py```
+
+
+## Startup
+
+Once the requirements are met and the configuration made, the application can be started by executing:
+```app.py```
 
