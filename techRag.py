@@ -612,3 +612,5 @@ class TechRAG:
         sources = list({item["source"] for item in results})
 
         return sources
+
+

@@ -2,7 +2,7 @@ import gradio as gr
 from techRag import TechRAG
 import os
 from typing import List, Dict
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from openai import OpenAI
 
 
@@ -99,7 +99,40 @@ def vanilla_chat(message, history):
               yield partial_message
 
 
+# Functiosn for the Settings tab.
+def get_specific_env_vars():
+    return {var: os.getenv(var, '') for var in ENV_VARS}
 
+def update_env_var(key, value):
+    if key not in ENV_VARS:
+        return f"Error: {key} is not a valid environment variable for this application."
+    
+    # Update the environment variable
+    os.environ[key] = value
+    
+    # Update the .env file
+    set_key('.env', key, value)
+    
+    return view_env_vars()
+
+def update_langsmith(value):
+    os.environ["LANGCHAIN_TRACING_V2"] = str(value).lower()
+    # Update the .env file
+    set_key('.env', "LANGCHAIN_TRACING_V2", str(value).lower())
+
+def str_to_bool(s):
+    return s.lower() == 'true'
+
+def view_env_vars():
+    env_vars = get_specific_env_vars()
+    return "\n".join([f"{k}: {v}" for k, v in env_vars.items()])
+
+def update_value_input(key):
+    return os.getenv(key, '')
+
+
+
+# ------------------------------------- - ------------------------------------ #
 
 load_dotenv()
 vector_db_server = os.getenv('VECTOR_DB_STORE')
@@ -112,6 +145,11 @@ vanilla_llm = OpenAI()
 
 # Create the RAG application
 tr = TechRAG(collection_name=collection_name, vector_db_host=vector_db_server, inform=True, debug=True)
+
+
+# Environment variables we're interested in for Settings
+ENV_VARS = ['VECTOR_DB_STORE', 'COLLECTION_NAME', 'USER_AGENT', 'OPENAI_API_KEY', 'TAVILY_API_KEY', 'LANGCHAIN_ENDPOINT', 'LANGCHAIN_API_KEY']
+
 
 CSS = """
 .wrap { display: flex; flex-direction: column; flex-grow: 1}
@@ -165,6 +203,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
         with gr.TabItem("Ingest"):
             # Ingest URL
             with gr.Group():
+                gr.Markdown("# Ingest URLs")
                 with gr.Row():
                     url_input = gr.Textbox(lines=5, placeholder="Enter URLs here, one per line", label="URLs")
                     url_output = gr.Textbox(label="Output")
@@ -175,6 +214,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
 
             # Ingest Fact
             with gr.Group():
+                gr.Markdown("# Ingest Fact")
                 with gr.Row():
                     with gr.Group():
                         fact_title = gr.Textbox(label="Fact Title")
@@ -189,11 +229,60 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
 
             # Ingest Document
             with gr.Group():
+                gr.Markdown("# Ingest Documents")
                 with gr.Row():
                     docx_input = gr.File(file_count="multiple", file_types=[".docx"], type="filepath")
                     docx_output = gr.Textbox(label="Output")
                 docx_button = gr.Button("Ingest Documents")
 
             docx_button.click(ingest_docx, inputs=docx_input, outputs=docx_output)
+
+        with gr.TabItem("Settings"):
+
+            with gr.Group():
+                gr.Markdown("# Settings")
+                with gr.Row():
+                    #view_button = gr.Button("View Environment Variables")
+                    env_vars_display = gr.Textbox(label="Current Settings", lines=5)
+
+
+                with gr.Row():
+                    with gr.Column():
+                        key_input = gr.Dropdown(choices=ENV_VARS, label="Update Setting", value=ENV_VARS[0])
+                    with gr.Column():
+                        value_input = gr.Textbox(label="Value", value=os.getenv(ENV_VARS[0], ''))
+                with gr.Row():
+                    update_button = gr.Button("Update Setting")
+            
+            gr.HTML("<hr class='fancy-line'>")
+
+            with gr.Group():
+                gr.Markdown("# Options")
+                with gr.Row():
+                    langsmith_enable = gr.Checkbox(label="Enable LangSmith", value=str_to_bool(os.getenv("LANGCHAIN_TRACING_V2", "false")))
+                    langsmith_update = gr.Button("Update")
+                    langsmith_update.click(
+                        update_langsmith,  
+                        inputs=[langsmith_enable]
+                        )
+            
+            key_input.change(
+                update_value_input,
+                inputs=[key_input],
+                outputs=[value_input]
+            )
+            
+            update_button.click(
+                update_env_var,
+                inputs=[key_input, value_input],
+                outputs=[env_vars_display]
+            )
+
+
+            # Display current values on load
+            env_vars_display.value = view_env_vars()
+
+
+
 
 demo.launch(share=False, server_name="0.0.0.0", favicon_path="techRag.ico")
