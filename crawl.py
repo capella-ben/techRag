@@ -3,9 +3,7 @@ from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 import csv
 import argparse
-
-"""Utility script to perform a crawl a web site in order to get a list of URL's for ingestion.
-"""
+from collections import deque
 
 def is_valid_url(url):
     parsed = urlparse(url)
@@ -14,44 +12,53 @@ def is_valid_url(url):
 def get_all_website_links(url):
     urls = set()
     domain_name = urlparse(url).netloc
-    session = requests.Session()
-    session.headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
-    response = session.get(url)
-    soup = BeautifulSoup(response.content, "html.parser")
-    for a_tag in soup.findAll("a"):
-        href = a_tag.attrs.get("href")
-        if href == "" or href is None:
-            continue
-        href = urljoin(url, href)
-        parsed_href = urlparse(href)
-        href = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
-        if not is_valid_url(href):
-            continue
-        if href in urls:
-            continue
-        if domain_name not in href:
-            continue
-        urls.add(href)
-    return urls, soup.title.string if soup.title else "No Title"
+    try:
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"})
+        soup = BeautifulSoup(response.content, "html.parser")
+        for a_tag in soup.findAll("a"):
+            href = a_tag.attrs.get("href")
+            if href == "" or href is None:
+                continue
+            href = urljoin(url, href)
+            parsed_href = urlparse(href)
+            href = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
+            if not is_valid_url(href):
+                continue
+            if domain_name not in href:
+                continue
+            urls.add(href)
+        return urls, soup.title.string if soup.title else "No Title"
+    except requests.RequestException:
+        return set(), "Error fetching page"
 
-def crawl(url, max_depth=1):
-    seen_urls = set()
-    crawled_data = []
-    def _crawl(urls, depth):
+def crawl(start_url, max_depth=1):
+    queue = deque([(start_url, 0)])
+    seen_urls = set([start_url])
+
+    while queue:
+        url, depth = queue.popleft()
         if depth > max_depth:
-            return
-        new_urls = set()
-        for url in urls:
-            if url not in seen_urls:
-                seen_urls.add(url)
-                links, title = get_all_website_links(url)
-                crawled_data.append((url, title))
-                print(f"Crawling: {url}\tTitle: {title}") 
-                new_urls.update(links)
-        _crawl(new_urls, depth + 1)
-    _crawl([url], 0)
-    return crawled_data
+            continue
 
+        links, title = get_all_website_links(url)
+        yield url, title
+        print(f"Crawling: {url}\tTitle: {title}")
+
+        for link in links:
+            if link not in seen_urls:
+                seen_urls.add(link)
+                queue.append((link, depth + 1))
+
+def sort_csv_file(filename):
+    with open(filename, 'r', newline='', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        header = next(reader)  # Read the header
+        sorted_rows = sorted(reader, key=lambda row: row[0])  # Sort by URL
+
+    with open(filename, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(header)  # Write the header
+        writer.writerows(sorted_rows)  # Write the sorted rows
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Web crawler script")
@@ -60,22 +67,25 @@ if __name__ == "__main__":
     parser.add_argument("--output", default="crawl_results.csv", help="Output file name (default: crawl_results.csv)")
     args = parser.parse_args()
 
-    result = crawl(args.url, max_depth=args.max_depth)
-
-    print()
-    print('----------------------------------------------------------------------')
-    result.sort(key=lambda x: x[0])
-    for url, title in result:
-        print(url)
-    print()
-    print()
-
-
+    # Crawl and write results to file
     with open(args.output, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(["URL", "Title"])
-        for url, title in result:
+
+        for url, title in crawl(args.url, max_depth=args.max_depth):
             writer.writerow([url, title])
-    
-    print("Results saved to crawl_results.csv")
-    
+            file.flush()
+
+    print("Crawl completed. Sorting results...")
+
+    # Sort the CSV file
+    sort_csv_file(args.output)
+
+    print(f"Sorted results saved to {args.output}")
+
+    # Print sorted URLs
+    with open(args.output, 'r', newline='', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        next(reader)  # Skip header
+        for row in reader:
+            print(row[0])  # Print URL
