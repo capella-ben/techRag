@@ -18,6 +18,8 @@ import gradio as gr
 from pymilvus import connections, Collection
 import os
 import pypandoc
+import pandas as pd
+
 
 # Required environment variables:
 # OPENAI_API_KEY, TAVILY_API_KEY
@@ -614,3 +616,75 @@ class TechRAG:
         return sources
 
 
+    def vector_db_search(self, search_term: str):
+        """Search the source field of the vector databas
+
+        Args:
+            search_term (str): The string to search for 
+
+        Returns:
+            DataFrame: DataFrame of results
+        """
+        results = self.collection.query(
+            expr=f'source like "%{search_term}%"',
+            output_fields=["source", "title", "pk"],
+            limit=50
+        )
+        return pd.DataFrame(results)
+
+    
+    def update_selected_rows_in_vector_db(self, evt: gr.SelectData, current_selections: List):
+        """Maintain the list of rows selected in the dataframe
+
+        Args:
+            evt (gr.SelectData): Selected data
+            current_selections (List): List of rows selected
+
+        Returns:
+            List: List of rows selected
+        """
+        if current_selections is None:
+            current_selections = []
+        
+        if evt.index[0] in current_selections:
+            current_selections.remove(evt.index[0])
+        else:
+            current_selections.append(evt.index[0])
+        
+        return sorted(current_selections)
+
+
+    def delete_vector_db_rows(self, df, selected_rows):
+        """Delete rows from the vector database
+
+        Args:
+            df (DataFrame): Dataframe to delete from
+            selected_rows (List): Selected rows
+
+        Returns:
+            Dataframe: Dataframe with rows removed
+            str: Result text
+        """
+        if not selected_rows:
+            return df, "No rows selected. Please select one or more rows to delete."
+        # df.iloc[selected_rows]['pk']
+        df = df.drop(df.index[selected_rows]).reset_index(drop=True)
+        return df, f"Deleted {len(selected_rows)} row(s) successfully."
+
+    # Function to highlight selected rows
+    def highlight_selected_rows(self, df, selected_rows):
+        """Highlight selected rows
+
+        Args:
+            df (DataFrame): Dataframe to update
+            selected_rows (List): List of selcted rows
+
+        Returns:
+            DataFrame: Dataframe with rows highlighted 
+        """
+        def highlight_row(row):
+            if row.name in selected_rows:
+                return ['background-color: yellow'] * len(row)
+            return [''] * len(row)
+        
+        return df.style.apply(highlight_row, axis=1)

@@ -151,14 +151,42 @@ tr = TechRAG(collection_name=collection_name, vector_db_host=vector_db_server, i
 ENV_VARS = ['VECTOR_DB_STORE', 'COLLECTION_NAME', 'USER_AGENT', 'OPENAI_API_KEY', 'TAVILY_API_KEY', 'LANGCHAIN_ENDPOINT', 'LANGCHAIN_API_KEY']
 
 
+
 CSS = """
-.wrap { display: flex; flex-direction: column; flex-grow: 1}
-.contain { display: flex; flex-direction: column; flex-grow: 1}
-.gradio-container { height: 100vh !important; }
-.tabs { display: flex !important; flex-direction: column; flex-grow: 1}
-.tabitem[role="tabpanel"][style="display: block;"] { display: flex !important; flex-direction: column; flex-grow: 1}
-.gap {display: flex; flex-direction: column; flex-grow: 1}
-#chatbot { display: flex !important; flex-direction: column; flex-grow: 1; }
+.wrap { 
+    display: flex; 
+    flex-direction: column; 
+    flex-grow: 1;
+}
+.contain { 
+    display: flex; 
+    flex-direction: column; 
+    flex-grow: 1;
+}
+.gradio-container { 
+    min-height: 100vh !important; /* Changed from height to min-height */
+    overflow-y: auto; /* Added to enable vertical scrolling */
+}
+.tabs { 
+    display: flex !important; 
+    flex-direction: column; 
+    flex-grow: 1;
+}
+.tabitem[role="tabpanel"][style="display: block;"] { 
+    display: flex !important; 
+    flex-direction: column; 
+    flex-grow: 1;
+}
+.gap {
+    display: flex; 
+    flex-direction: column; 
+    flex-grow: 1;
+}
+#chatbot { 
+    display: flex !important; 
+    flex-direction: column; 
+    flex-grow: 1; 
+}
 
 .fancy-line {
     border: 0;
@@ -166,15 +194,23 @@ CSS = """
     background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
     margin: 20px 0;
 }
-
+"""
+x = """
+/* Added to ensure content doesn't overflow horizontally */
+body {
+    overflow-x: hidden;
+}
 """
 
 with gr.Blocks(css=CSS, title="Tech RAG") as demo:
     with gr.Tabs() as tabs:
         with gr.TabItem("RAG Chat"):
             chatbot = gr.Chatbot(elem_id="chatbot", layout='panel')
-            msg = gr.Textbox(placeholder="Type a message...", label="")
-            clear = gr.Button("Clear")
+            with gr.Row():
+                with gr.Column(scale=16):
+                    msg = gr.Textbox(placeholder="Type a message...", label="")
+                with gr.Column(scale=1, min_width=60):
+                    clear = gr.Button("Clear")
 
             def respond(message, chat_history):
                 bot_message = rag_response(message, chat_history)
@@ -186,8 +222,11 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
 
         with gr.TabItem("Chat"):
             vanilla_chatbot = gr.Chatbot(elem_id="chatbot", layout='panel')
-            vanilla_msg = gr.Textbox(placeholder="Type a message...", label="")
-            vanilla_clear = gr.Button("Clear")
+            with gr.Row():
+                with gr.Column(scale=16):
+                    vanilla_msg = gr.Textbox(placeholder="Type a message...", label="")
+                with gr.Column(scale=1, min_width=60):
+                    vanilla_clear = gr.Button("Clear")
 
             def vanilla_respond(message, chat_history):
                 bot_message = ""
@@ -207,8 +246,13 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                 with gr.Row():
                     url_input = gr.Textbox(lines=5, placeholder="Enter URLs here, one per line", label="URLs")
                     url_output = gr.Textbox(label="Output")
-                url_button = gr.Button("Ingest URLs")
-                url_button.click(ingest_urls, inputs=url_input, outputs=url_output)
+                with gr.Row():
+                    with gr.Column(scale=5):
+                        url_button = gr.Button("Ingest URLs", variant='primary')
+                        url_button.click(ingest_urls, inputs=url_input, outputs=url_output)
+                    with gr.Column(scale=1):
+                        url_clear = gr.Button("Clear")
+                        url_clear.click(lambda: None, None, url_input, queue=False)
 
             gr.HTML("<hr class='fancy-line'>")
 
@@ -221,9 +265,13 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                         fact_description = gr.Textbox(label="Description")
                         fact_content = gr.Textbox(label="Fact", lines=5)
                     fact_output = gr.Textbox(label="Output")
-                fact_button = gr.Button("Ingest Fact")
-
-            fact_button.click(ingest_fact, inputs=[fact_title, fact_description, fact_content], outputs=fact_output)
+                with gr.Row():
+                    with gr.Column(scale=5):
+                        fact_button = gr.Button("Ingest Fact", variant='primary')
+                        fact_button.click(ingest_fact, inputs=[fact_title, fact_description, fact_content], outputs=fact_output)
+                    with gr.Column(scale=1):
+                        fact_clear = gr.Button("Clear")
+                        fact_clear.click(lambda: (None, None, None), None, [fact_title, fact_description, fact_content], queue=False)
 
             gr.HTML("<hr class='fancy-line'>")
 
@@ -232,10 +280,14 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                 gr.Markdown("# Ingest Documents")
                 with gr.Row():
                     docx_input = gr.File(file_count="multiple", file_types=[".docx"], type="filepath")
-                    docx_output = gr.Textbox(label="Output")
-                docx_button = gr.Button("Ingest Documents")
-
-            docx_button.click(ingest_docx, inputs=docx_input, outputs=docx_output)
+                    docx_output = gr.Textbox(label="Output", lines=1)
+                with gr.Row():
+                    with gr.Column(scale=5):
+                        docx_button = gr.Button("Ingest Documents", variant='primary')
+                        docx_button.click(ingest_docx, inputs=docx_input, outputs=docx_output)
+                    with gr.Column(scale=1):
+                        docx_clear = gr.Button("Clear")
+                        docx_clear.click(lambda: None, None, docx_input, queue=False)
 
         with gr.TabItem("Settings"):
 
@@ -252,7 +304,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                     with gr.Column():
                         value_input = gr.Textbox(label="Value", value=os.getenv(ENV_VARS[0], ''))
                 with gr.Row():
-                    update_button = gr.Button("Update Setting")
+                    update_button = gr.Button("Update Setting", variant='primary')
             
             gr.HTML("<hr class='fancy-line'>")
 
@@ -260,7 +312,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                 gr.Markdown("# Options")
                 with gr.Row():
                     langsmith_enable = gr.Checkbox(label="Enable LangSmith", value=str_to_bool(os.getenv("LANGCHAIN_TRACING_V2", "false")))
-                    langsmith_update = gr.Button("Update")
+                    langsmith_update = gr.Button("Update", variant='primary')
                     langsmith_update.click(
                         update_langsmith,  
                         inputs=[langsmith_enable]
@@ -281,6 +333,64 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
 
             # Display current values on load
             env_vars_display.value = view_env_vars()
+
+        with gr.TabItem("DB Prune"):
+            selected_rows = gr.State([])
+            
+            gr.Markdown("# Vector Database Pruning")
+            
+            with gr.Row():
+                search_input = gr.Textbox(label="Search Source")
+                search_button = gr.Button("Search")
+            
+            with gr.Row():
+                dataframe_output = gr.Dataframe(
+                    interactive=False,
+                    #col_count=(3, "fixed"),
+                    row_count=(50, "dynamic"),
+                    #wrap=True,
+                )
+                
+            with gr.Row():
+                delete_button = gr.Button("Delete Selected Rows")
+                
+            message_output = gr.Textbox(label="Message")
+            
+            def search_and_update(search_term):
+                result_df = tr.vector_db_search(search_term)
+                return result_df, []  # Return empty list to reset selected_rows
+            
+            search_button.click(
+                search_and_update,
+                inputs=[search_input],
+                outputs=[dataframe_output, selected_rows]
+            )
+            
+            search_input.submit(
+                search_and_update,
+                inputs=[search_input],
+                outputs=[dataframe_output, selected_rows]
+            )
+
+            dataframe_output.select(
+                tr.update_selected_rows_in_vector_db,
+                [selected_rows],
+                selected_rows
+            ).then(
+                lambda df, rows: tr.highlight_selected_rows(df, rows),
+                [dataframe_output, selected_rows],
+                dataframe_output
+            )
+            
+            delete_button.click(
+                tr.delete_vector_db_rows,
+                inputs=[dataframe_output, selected_rows],
+                outputs=[dataframe_output, message_output]
+            ).then(
+                lambda: [],
+                None,
+                selected_rows
+            )
 
 
 
