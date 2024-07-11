@@ -204,6 +204,7 @@ body {
 
 with gr.Blocks(css=CSS, title="Tech RAG") as demo:
     with gr.Tabs() as tabs:
+        # --------------------------------- RAG Chat --------------------------------- #
         with gr.TabItem("RAG Chat"):
             chatbot = gr.Chatbot(elem_id="chatbot", layout='panel')
             with gr.Row():
@@ -220,6 +221,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
             msg.submit(respond, [msg, chatbot], [msg, chatbot])
             clear.click(lambda: None, None, chatbot, queue=False)
 
+        # ----------------------------------- Chat ----------------------------------- #
         with gr.TabItem("Chat"):
             vanilla_chatbot = gr.Chatbot(elem_id="chatbot", layout='panel')
             with gr.Row():
@@ -239,6 +241,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
             vanilla_msg.submit(vanilla_respond, [vanilla_msg, vanilla_chatbot], [vanilla_msg, vanilla_chatbot])
             vanilla_clear.click(lambda: None, None, vanilla_chatbot, queue=False)
 
+        # ---------------------------------- Ingest ---------------------------------- #
         with gr.TabItem("Ingest"):
             # Ingest URL
             with gr.Group():
@@ -289,6 +292,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
                         docx_clear = gr.Button("Clear")
                         docx_clear.click(lambda: None, None, docx_input, queue=False)
 
+        # --------------------------------- Settings --------------------------------- #
         with gr.TabItem("Settings"):
 
             with gr.Group():
@@ -334,6 +338,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
             # Display current values on load
             env_vars_display.value = view_env_vars()
 
+        # --------------------------------- DB Prune --------------------------------- #
         with gr.TabItem("DB Prune"):
             selected_rows = gr.State([])
             
@@ -346,9 +351,7 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
             with gr.Row():
                 dataframe_output = gr.Dataframe(
                     interactive=False,
-                    #col_count=(3, "fixed"),
-                    row_count=(50, "dynamic"),
-                    #wrap=True,
+                    row_count=(50, "dynamic")
                 )
                 
             with gr.Row():
@@ -358,6 +361,8 @@ with gr.Blocks(css=CSS, title="Tech RAG") as demo:
             
             def search_and_update(search_term):
                 result_df = tr.vector_db_search(search_term)
+                result_df = result_df[['source', 'title', 'pk']]        # reorder the dataframe
+                result_df['pk'] = result_df['pk'].astype(str)           # The gradio dataframe can only really handle strings.
                 return result_df, []  # Return empty list to reset selected_rows
             
             search_button.click(

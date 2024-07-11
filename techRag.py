@@ -1,6 +1,6 @@
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_milvus.vectorstores import Milvus
 from langchain_openai import OpenAIEmbeddings
 from typing import Literal
@@ -444,16 +444,6 @@ class TechRAG:
 
         filenames = [s for s in filenames if s.strip()]       # clean out any empty entries
 
-        md_filenames = []
-        # convert to markdown
-        for filename in filenames:
-            md_filename = str(filename).replace(".docx", ".md")
-            pypandoc.convert_file(filename, 'md', outputfile=md_filename)
-            md_filenames.append(md_filename)
-
-
-        print("Loading and Splitting Word documents...")
-        if self.inform and self.debug: gr.Info(f"Loading and Splitting Word documents...")
 
         # check to see if the filename is already in the vector store
         clean_filenames = []
@@ -463,7 +453,20 @@ class TechRAG:
                 clean_filenames.append(u)
             else:
                 return_str = return_str + u  + " is already in vector store" + "\n"
-        md_filenames = clean_filenames
+        filenames = clean_filenames
+
+
+        md_filenames = []
+        # convert to markdown
+        for filename in filenames:
+            md_filename = str(filename).replace(".docx", ".md")
+            pypandoc.convert_file(filename, 'md', outputfile=md_filename, encoding='utf-8')
+            md_filenames.append(md_filename)
+
+
+        print("Loading and Splitting Word documents...")
+        if self.inform and self.debug: gr.Info(f"Loading and Splitting Word documents...")
+
 
         print(f"filtered: {len(md_filenames)}")
         if len(md_filenames) == 0: return return_str       # if there are no urls left in the list then 
@@ -478,7 +481,7 @@ class TechRAG:
         doc_splits=[]
         for md_filename in md_filenames:
             
-            with open(md_filename, 'r') as mdf:
+            with open(md_filename, 'r', encoding="utf8", errors="ignore") as mdf:
                 md = mdf.read()
             markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on, return_each_line=False, strip_headers=False)
             docs = markdown_splitter.split_text(md)
@@ -502,14 +505,24 @@ class TechRAG:
             doc_splits = doc_splits + docs
 
 
-        # check that the split is not too big for the vector store. 
+        secondary_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.vs_length - 512,
+            chunk_overlap=200,
+            length_function=len,
+        )
+
+        new_doc_splits = []
         for split in doc_splits:
             if len(split.page_content) > self.vs_length:
-                # delete the element
-                doc_splits.remove(split)
-                print(f"Split removed to to excessive length (over {self.vs_length})")
-                return_str = return_str + f"Split removed to to excessive length (over {self.vs_length})\n"
+                # Split the document if it's too long
+                split_docs = secondary_splitter.split_documents([split])
+                new_doc_splits.extend(split_docs)
+                print(f"Split document into {len(split_docs)} smaller chunks due to excessive length (over {self.vs_length})")
+                return_str = return_str + f"Split document into {len(split_docs)} smaller chunks due to excessive length (over {self.vs_length})\n"
+            else:
+                new_doc_splits.append(split)
 
+        doc_splits = new_doc_splits
        
         print("Adding to vector store...")
         if self.inform and self.debug: gr.Info(f"Adding to vector store...")
@@ -667,11 +680,13 @@ class TechRAG:
         """
         if not selected_rows:
             return df, "No rows selected. Please select one or more rows to delete."
-        # df.iloc[selected_rows]['pk']
+        for selected_row in selected_rows:
+            print(df.iloc[selected_row]['pk'])
+            self.collection.delete(f'pk == {df.iloc[selected_row]["pk"]}')
         df = df.drop(df.index[selected_rows]).reset_index(drop=True)
         return df, f"Deleted {len(selected_rows)} row(s) successfully."
 
-    # Function to highlight selected rows
+
     def highlight_selected_rows(self, df, selected_rows):
         """Highlight selected rows
 
