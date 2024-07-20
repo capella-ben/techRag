@@ -62,14 +62,14 @@ class GraphState(TypedDict):
 
 
 class TechRAG:
+   
 
-    
-    
-
-    def __init__(self, collection_name: str,  vector_db_host: str, vector_db_port = "19530", 
+    def __init__(self, collection_name: str,  vector_db_host: str, vector_db_port = "19530", vector_certainty = 0.85,
                  large_llm_name = "gpt-4o", small_llm_name = "gpt-4o-mini", embedding_model_name = "text-embedding-3-large", 
                  inform=False, debug=False):
-        
+
+        # vector_certainty = Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to maximum relevance. Defaults to 0.5.
+
         self.collection_name = collection_name
         self.large_llm_Model_name = large_llm_name
         self.small_llm_Model_name = small_llm_name
@@ -95,7 +95,7 @@ class TechRAG:
             connection_args={"host": vector_db_host, "port": vector_db_port}, 
             auto_id=True
         )
-        self.retriever = self.vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 6 , "lambda_mult": 0.5})
+        self.retriever = self.vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 6 , "lambda_mult": vector_certainty})
         # lambda_mult (float) – Number between 0 and 1 that determines the degree of diversity among the results with 0 corresponding to maximum diversity and 1 to maximum relevance. Defaults to 0.5.
 
         self.vs_length = self.__get_vector_db_text_length()
@@ -108,7 +108,7 @@ class TechRAG:
 
         # Prompt
         system = """You are a grader assessing relevance of a retrieved document to a user question. \n 
-            If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
+            If the document contains keyword(s) or semantic meaning related to all or part of the user question, grade it as relevant. \n
             It does not need to be a stringent test. The goal is to filter out erroneous retrievals. \n
             Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""
         grade_prompt = ChatPromptTemplate.from_messages(
@@ -131,25 +131,6 @@ class TechRAG:
 
 
         
-
-
-        # ---------------------------- Question Re-writer ---------------------------- #
-        # Prompt
-        system = """You a question re-writer that converts an input question to a better version that is optimized \n 
-            for vectorstore retrieval. Look at the input and try to reason about the underlying semantic intent / meaning."""
-        re_write_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system),
-                (
-                    "human",
-                    "Here is the initial question: \n\n {question} \n Formulate an improved question.",
-                ),
-            ]
-        )
-
-        self.question_rewriter = re_write_prompt | self.llm | StrOutputParser()
-
-
         # ---------------------------------- Search ---------------------------------- #
 
         self.web_search_tool = TavilySearchResults(k=3)
