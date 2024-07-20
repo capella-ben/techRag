@@ -67,11 +67,12 @@ class TechRAG:
     
 
     def __init__(self, collection_name: str,  vector_db_host: str, vector_db_port = "19530", 
-                 openAiModelName = "gpt-4o", embedding_model_name = "text-embedding-3-large", 
+                 large_llm_name = "gpt-4o", small_llm_name = "gpt-4o-mini", embedding_model_name = "text-embedding-3-large", 
                  inform=False, debug=False):
         
         self.collection_name = collection_name
-        self.llm_Model_name = openAiModelName
+        self.large_llm_Model_name = large_llm_name
+        self.small_llm_Model_name = small_llm_name
         self.embedding_model_name = embedding_model_name
         self.inform = inform
         self.debug = debug
@@ -82,7 +83,8 @@ class TechRAG:
         self.collection = Collection(collection_name)
 
         # ------------------------------------ LLM ----------------------------------- #
-        self.llm = ChatOpenAI(model=self.llm_Model_name, temperature=0)
+        self.llm = ChatOpenAI(model=self.large_llm_Model_name, temperature=0)
+        self.llm_small = ChatOpenAI(model=self.small_llm_Model_name, temperature=0)
 
         self.embedding_function = OpenAIEmbeddings(model=self.embedding_model_name)
 
@@ -102,7 +104,7 @@ class TechRAG:
         
         # ----------------------------- Retreival Grader ----------------------------- #
         # LLM with function call
-        structured_llm_grader = self.llm.with_structured_output(GradeDocuments)
+        structured_llm_grader = self.llm_small.with_structured_output(GradeDocuments)
 
         # Prompt
         system = """You are a grader assessing relevance of a retrieved document to a user question. \n 
